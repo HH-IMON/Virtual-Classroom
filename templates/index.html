@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Classroom - Smart Learning Platform</title>
+    <meta name="description" content="Modern virtual classroom with AI, live quizzes, whiteboard, gamification and more">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+
+<!-- ═══════════════ LOADING OVERLAY ═══════════════ -->
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loader-ring"><div></div><div></div><div></div><div></div></div>
+</div>
+
+<!-- ═══════════════ TOAST CONTAINER ═══════════════ -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ═══════════════ GLOBAL BACKGROUND ═══════════════ -->
+<div class="global-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+    <div class="orb orb-6"></div>
+</div>
+
+<!-- ═══════════════ AUTH SCREEN ═══════════════ -->
+<div id="auth-screen" class="auth-screen">
+    <div class="auth-container">
+        <!-- Login -->
+        <div id="login-form" class="auth-card glass-card">
+            <div class="auth-logo">
+                <div class="logo-icon"><i data-lucide="graduation-cap"></i></div>
+                <h1>Virtual Classroom</h1>
+                <p>Smart Learning Platform</p>
+            </div>
+            <div id="login-error" class="alert alert-error hidden"></div>
+            <div class="form-group">
+                <label for="login-email"><i data-lucide="mail" style="width:14px;height:14px;display:inline;vertical-align:middle"></i> Email</label>
+                <input type="email" id="login-email" placeholder="Enter your email" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="login-password"><i data-lucide="lock" style="width:14px;height:14px;display:inline;vertical-align:middle"></i> Password</label>
+                <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password">
+            </div>
+            <button class="btn btn-primary btn-full" id="login-btn" onclick="Auth.login()">
+                <span>Sign In</span><i data-lucide="arrow-right"></i>
+            </button>
+            <div class="auth-divider"><span>Demo Accounts</span></div>
+            <div class="demo-accounts">
+                <button class="demo-btn teacher" onclick="Auth.fillDemo('teacher')">
+                    <i data-lucide="presentation"></i> Teacher: teacher@demo.com
+                </button>
+                <button class="demo-btn student" onclick="Auth.fillDemo('student')">
+                    <i data-lucide="book-open"></i> Student: student@demo.com
+                </button>
+            </div>
+            <div class="auth-switch">
+                Don't have an account? <a onclick="Auth.showRegister()">Sign Up</a>
+            </div>
+        </div>
+
+        <!-- Register -->
+        <div id="register-form" class="auth-card glass-card hidden">
+            <div class="auth-logo">
+                <div class="logo-icon"><i data-lucide="user-plus"></i></div>
+                <h1>Create Account</h1>
+                <p>Join the Smart Classroom</p>
+            </div>
+            <div id="register-error" class="alert alert-error hidden"></div>
+            <div class="form-row">
+                <div class="form-group"><label>First Name</label><input type="text" id="reg-firstname" placeholder="First name"></div>
+                <div class="form-group"><label>Last Name</label><input type="text" id="reg-lastname" placeholder="Last name"></div>
+            </div>
+            <div class="form-group"><label>Username</label><input type="text" id="reg-username" placeholder="Choose a username" autocomplete="username"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="Your email address" autocomplete="email"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="reg-password" placeholder="Min 6 characters" autocomplete="new-password"></div>
+            <div class="form-group">
+                <label>Role</label>
+                <div class="role-selector">
+                    <label class="role-option active" onclick="this.parentElement.querySelectorAll('.role-option').forEach(o=>o.classList.remove('active'));this.classList.add('active')">
+                        <input type="radio" name="role" value="student" checked hidden><i data-lucide="book-open"></i> Student
+                    </label>
+                    <label class="role-option" onclick="this.parentElement.querySelectorAll('.role-option').forEach(o=>o.classList.remove('active'));this.classList.add('active')">
+                        <input type="radio" name="role" value="teacher" hidden><i data-lucide="presentation"></i> Teacher
+                    </label>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-full" id="register-btn" onclick="Auth.register()">
+                <span>Create Account</span><i data-lucide="arrow-right"></i>
+            </button>
+            <div class="auth-switch">Already have an account? <a onclick="Auth.showLogin()">Sign In</a></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════ MAIN APP ═══════════════ -->
+<div id="app-screen" class="app-screen hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-icon small"><i data-lucide="graduation-cap"></i></div>
+            <span class="logo-text">Virtual Classroom</span>
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav">
+            <a class="nav-item active" data-page="dashboard" href="#/dashboard">
+                <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+            </a>
+            <a class="nav-item" data-page="classes" href="#/classes">
+                <i data-lucide="book-open"></i><span>My Classes</span>
+            </a>
+            <a class="nav-item" data-page="chat" href="#/chat">
+                <i data-lucide="message-circle"></i><span>Chat</span>
+            </a>
+            <a class="nav-item" data-page="calendar" href="#/calendar">
+                <i data-lucide="calendar"></i><span>Calendar</span>
+            </a>
+            <a class="nav-item" data-page="files" href="#/files">
+                <i data-lucide="folder"></i><span>Files</span>
+            </a>
+            <div class="nav-divider"></div>
+            <div class="nav-section-title">Advanced</div>
+            <a class="nav-item" data-page="ai" href="#/ai">
+                <i data-lucide="bot"></i><span>AI Assistant</span>
+                <span class="nav-badge new">AI</span>
+            </a>
+            <a class="nav-item" data-page="whiteboard" href="#/whiteboard">
+                <i data-lucide="pen-tool"></i><span>Whiteboard</span>
+            </a>
+            <a class="nav-item" data-page="gamification" href="#/gamification">
+                <i data-lucide="trophy"></i><span>Rewards</span>
+            </a>
+            <a class="nav-item" data-page="analytics" href="#/analytics">
+                <i data-lucide="bar-chart-3"></i><span>Analytics</span>
+            </a>
+            <div class="nav-divider"></div>
+            <div class="nav-section-title">Productivity</div>
+            <a class="nav-item" data-page="todos" href="#/todos">
+                <i data-lucide="check-square"></i><span>To-Do List</span>
+            </a>
+            <a class="nav-item" data-page="bookmarks" href="#/bookmarks">
+                <i data-lucide="bookmark"></i><span>Bookmarks</span>
+            </a>
+            <a class="nav-item" data-page="settings" href="#/settings">
+                <i data-lucide="settings"></i><span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="btn-icon mobile-menu" onclick="App.toggleSidebar()"><i data-lucide="menu"></i></button>
+                <div class="search-box">
+                    <i data-lucide="search"></i>
+                    <input type="text" placeholder="Search classes, assignments..." id="global-search" oninput="App.handleSearch(this.value)">
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon theme-toggle" onclick="App.toggleTheme()" title="Toggle theme">
+                    <i data-lucide="moon" id="theme-icon-dark"></i>
+                    <i data-lucide="sun" id="theme-icon-light" class="hidden"></i>
+                </button>
+                <button class="btn-icon" id="notification-btn" onclick="App.toggleNotifications()" title="Notifications">
+                    <i data-lucide="bell"></i>
+                    <span class="notif-badge hidden" id="notif-badge">0</span>
+                </button>
+                <div class="user-menu" id="user-menu-trigger" onclick="App.toggleUserMenu()">
+                    <div class="user-avatar gradient-avatar" id="topbar-avatar"><span id="topbar-avatar-text">U</span></div>
+                    <span class="user-name" id="topbar-username">User</span>
+                    <i data-lucide="chevron-down" style="width:14px;height:14px;opacity:.6"></i>
+                </div>
+            </div>
+
+            <!-- Notification Panel -->
+            <div class="dropdown-panel notification-panel hidden" id="notification-panel">
+                <div class="dropdown-header">
+                    <h3>Notifications</h3>
+                    <button class="btn btn-ghost btn-sm" onclick="App.markAllNotificationsRead()">Mark all read</button>
+                </div>
+                <div class="dropdown-body" id="notification-list"></div>
+            </div>
+
+            <!-- User Dropdown -->
+            <div class="dropdown-panel user-dropdown hidden" id="user-dropdown">
+                <div class="dropdown-profile">
+                    <div class="user-avatar gradient-avatar lg"><span id="dropdown-avatar-text">U</span></div>
+                    <div><strong id="dropdown-name">User</strong><br>
+                    <small id="dropdown-email">user@email.com</small><br>
+                    <span class="badge" id="dropdown-role">student</span></div>
+                </div>
+                <div class="dropdown-menu">
+                    <a onclick="window.location.hash='#/settings'"><i data-lucide="user"></i> Profile</a>
+                    <a onclick="window.location.hash='#/analytics'"><i data-lucide="bar-chart-3"></i> Analytics</a>
+                    <a onclick="window.location.hash='#/gamification'"><i data-lucide="trophy"></i> Rewards</a>
+                    <div class="dropdown-divider"></div>
+                    <a onclick="Auth.logout()" class="danger"><i data-lucide="log-out"></i> Sign Out</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <div class="content-area" id="content-area">
+            <!-- Content rendered dynamically by JS -->
+        </div>
+    </main>
+</div>
+
+<!-- ═══════════════ VIDEO CALL SCREEN ═══════════════ -->
+<div id="video-screen" class="video-screen hidden">
+    <div class="video-topbar">
+        <div class="video-topbar-left">
+            <div class="video-room-info">
+                <i data-lucide="video" style="width:20px;height:20px;color:var(--accent-red)"></i>
+                <span id="video-room-name">Live Class</span>
+                <span class="live-badge">LIVE</span>
+            </div>
+            <span class="video-timer" id="video-timer">00:00:00</span>
+        </div>
+        <div class="video-topbar-right">
+            <span class="video-participant-badge"><i data-lucide="users" style="width:14px;height:14px"></i> <span id="video-participant-count">1</span></span>
+            <button class="btn btn-danger btn-sm" onclick="VideoCall.leaveCall()"><i data-lucide="phone-off"></i> Leave</button>
+        </div>
+    </div>
+    <div class="video-body">
+        <div class="video-grid" id="video-grid">
+            <div class="video-tile local-tile" id="local-tile">
+                <video id="local-video" autoplay muted playsinline></video>
+                <div class="video-tile-overlay">
+                    <span class="video-tile-name" id="local-video-name">You</span>
+                    <div class="video-tile-indicators">
+                        <i data-lucide="mic-off" class="indicator-icon hidden" id="local-mic-indicator"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="video-sidebar hidden" id="video-sidebar">
+            <div class="video-sidebar-header">
+                <h3 id="video-sidebar-title">Chat</h3>
+                <button class="btn-icon" onclick="VideoCall.closeSidebar()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="video-sidebar-content" id="video-sidebar-content"></div>
+        </div>
+    </div>
+    <div class="video-controls">
+        <button class="video-control-btn" id="btn-toggle-mic" onclick="VideoCall.toggleMic()" title="Toggle Microphone">
+            <i data-lucide="mic" id="mic-icon-on"></i><i data-lucide="mic-off" id="mic-icon-off" class="hidden"></i>
+        </button>
+        <button class="video-control-btn" id="btn-toggle-camera" onclick="VideoCall.toggleCamera()" title="Toggle Camera">
+            <i data-lucide="video" id="cam-icon-on"></i><i data-lucide="video-off" id="cam-icon-off" class="hidden"></i>
+        </button>
+        <button class="video-control-btn" id="btn-share-screen" onclick="VideoCall.toggleScreenShare()" title="Share Screen">
+            <i data-lucide="monitor"></i>
+        </button>
+        <button class="video-control-btn" id="btn-raise-hand" onclick="VideoCall.toggleRaiseHand()" title="Raise Hand">
+            <i data-lucide="hand"></i>
+        </button>
+        <button class="video-control-btn" id="btn-quiz-inclass" onclick="VideoCall.toggleInClassQuiz()" title="Live Quiz">
+            <i data-lucide="help-circle"></i>
+        </button>
+        <button class="video-control-btn" id="btn-chat-toggle" onclick="VideoCall.toggleChat()" title="Chat">
+            <i data-lucide="message-circle"></i>
+        </button>
+        <button class="video-control-btn" id="btn-participants" onclick="VideoCall.toggleParticipantsList()" title="Participants">
+            <i data-lucide="users"></i>
+        </button>
+        <button class="video-control-btn danger" onclick="VideoCall.leaveCall()" title="Leave Call">
+            <i data-lucide="phone-off"></i>
+        </button>
+    </div>
+</div>
+
+<!-- ═══════════════ WHITEBOARD SCREEN ═══════════════ -->
+<div id="whiteboard-screen" class="whiteboard-screen hidden">
+    <div class="whiteboard-toolbar">
+        <div class="whiteboard-toolbar-left">
+            <button class="btn btn-ghost btn-sm" onclick="Whiteboard.close()"><i data-lucide="arrow-left"></i> Back</button>
+            <span class="whiteboard-title" id="wb-title">Collaborative Whiteboard</span>
+        </div>
+        <div class="whiteboard-tools">
+            <button class="wb-tool active" data-tool="pen" onclick="Whiteboard.setTool('pen')" title="Pen"><i data-lucide="pen-tool"></i></button>
+            <button class="wb-tool" data-tool="eraser" onclick="Whiteboard.setTool('eraser')" title="Eraser"><i data-lucide="eraser"></i></button>
+            <button class="wb-tool" data-tool="text" onclick="Whiteboard.setTool('text')" title="Text"><i data-lucide="type"></i></button>
+            <button class="wb-tool" data-tool="rect" onclick="Whiteboard.setTool('rect')" title="Rectangle"><i data-lucide="square"></i></button>
+            <button class="wb-tool" data-tool="circle" onclick="Whiteboard.setTool('circle')" title="Circle"><i data-lucide="circle"></i></button>
+            <button class="wb-tool" data-tool="sticky" onclick="Whiteboard.addSticky()" title="Sticky Note"><i data-lucide="sticky-note"></i></button>
+            <div class="wb-separator"></div>
+            <input type="color" id="wb-color" value="#6366f1" onchange="Whiteboard.setColor(this.value)" title="Color">
+            <input type="range" id="wb-size" value="3" min="1" max="20" onchange="Whiteboard.setSize(this.value)" title="Size">
+            <div class="wb-separator"></div>
+            <button class="wb-tool" onclick="Whiteboard.undo()" title="Undo"><i data-lucide="undo-2"></i></button>
+            <button class="wb-tool" onclick="Whiteboard.clearAll()" title="Clear"><i data-lucide="trash-2"></i></button>
+            <button class="wb-tool" onclick="Whiteboard.download()" title="Download"><i data-lucide="download"></i></button>
+        </div>
+    </div>
+    <div class="whiteboard-canvas-wrapper">
+        <canvas id="whiteboard-canvas"></canvas>
+        <div id="sticky-container" class="sticky-container"></div>
+    </div>
+</div>
+
+<!-- ═══════════════ MODALS ═══════════════ -->
+
+<!-- Create Class Modal -->
+<div class="modal hidden" id="modal-create-class">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-create-class')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header"><h2><i data-lucide="plus-circle"></i> Create New Class</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-create-class')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Class Name *</label><input type="text" id="class-name" placeholder="e.g. Web Development 101"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Subject</label><input type="text" id="class-subject" placeholder="e.g. Computer Science"></div>
+                <div class="form-group"><label>Section</label><input type="text" id="class-section" placeholder="e.g. Section A"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea id="class-description" rows="3" placeholder="Describe your class..."></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="App.closeModal('modal-create-class')">Cancel</button>
+            <button class="btn btn-primary" onclick="ClassroomView.createClass()"><i data-lucide="plus"></i> Create</button></div>
+    </div>
+</div>
+
+<!-- Join Class Modal -->
+<div class="modal hidden" id="modal-join-class">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-join-class')"></div>
+    <div class="modal-content glass-card small">
+        <div class="modal-header"><h2><i data-lucide="log-in"></i> Join a Class</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-join-class')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Class Code</label>
+            <input type="text" id="join-code" placeholder="Enter 6-character code" maxlength="6" style="text-transform:uppercase;letter-spacing:4px;font-size:1.2rem;text-align:center"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary btn-full" onclick="ClassroomView.joinClass()">Join Class</button></div>
+    </div>
+</div>
+
+<!-- Create Assignment Modal -->
+<div class="modal hidden" id="modal-create-assignment">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-create-assignment')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header"><h2><i data-lucide="file-plus"></i> Create Assignment</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-create-assignment')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Title *</label><input type="text" id="assign-title" placeholder="Assignment title"></div>
+            <div class="form-group"><label>Description</label><textarea id="assign-description" rows="3" placeholder="Instructions..."></textarea></div>
+            <div class="form-row">
+                <div class="form-group"><label>Due Date</label><input type="datetime-local" id="assign-due"></div>
+                <div class="form-group"><label>Points</label><input type="number" id="assign-points" value="100" min="0"></div>
+            </div>
+            <div class="form-group"><label>Type</label>
+                <select id="assign-type"><option value="assignment">Assignment</option><option value="quiz">Quiz</option><option value="material">Material</option></select></div>
+            <div class="form-group"><label>Attach File (PDF, DOCX, etc.)</label>
+                <div class="file-drop-zone" id="assign-file-drop"
+                    ondragover="event.preventDefault();this.classList.add('drag-over')"
+                    ondragleave="this.classList.remove('drag-over')"
+                    ondrop="event.preventDefault();this.classList.remove('drag-over');document.getElementById('assign-file').files=event.dataTransfer.files;document.getElementById('assign-file-name').textContent=event.dataTransfer.files[0].name">
+                    <i data-lucide="upload-cloud" style="width:32px;height:32px;color:var(--accent-primary)"></i>
+                    <p>Drag & drop or <label for="assign-file" class="link">browse</label></p>
+                    <small id="assign-file-name"></small>
+                    <input type="file" id="assign-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.png,.jpg,.jpeg,.gif"
+                        onchange="document.getElementById('assign-file-name').textContent=this.files[0]?.name||''">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="App.closeModal('modal-create-assignment')">Cancel</button>
+            <button class="btn btn-primary" onclick="ClassroomView.createAssignment()"><i data-lucide="plus"></i> Create</button></div>
+    </div>
+</div>
+
+<!-- Submit Assignment Modal -->
+<div class="modal hidden" id="modal-submit-assignment">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-submit-assignment')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header"><h2><i data-lucide="upload"></i> Submit Assignment</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-submit-assignment')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div id="submit-assignment-info"></div>
+            <div class="form-group"><label>Your Work</label><textarea id="submit-content" rows="4" placeholder="Type your answer or notes here..."></textarea></div>
+            <div class="form-group"><label>Attach File</label>
+                <div class="file-drop-zone" id="submit-file-drop"
+                    ondragover="event.preventDefault();this.classList.add('drag-over')"
+                    ondragleave="this.classList.remove('drag-over')"
+                    ondrop="event.preventDefault();this.classList.remove('drag-over');document.getElementById('submit-file').files=event.dataTransfer.files;document.getElementById('submit-file-name').textContent=event.dataTransfer.files[0].name">
+                    <i data-lucide="upload-cloud" style="width:32px;height:32px;color:var(--accent-primary)"></i>
+                    <p>Drag & drop or <label for="submit-file" class="link">browse</label></p>
+                    <small id="submit-file-name"></small>
+                    <input type="file" id="submit-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.png,.jpg,.jpeg,.gif"
+                        onchange="document.getElementById('submit-file-name').textContent=this.files[0]?.name||''">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="App.closeModal('modal-submit-assignment')">Cancel</button>
+            <button class="btn btn-primary" onclick="ClassroomView.submitAssignment()"><i data-lucide="send"></i> Submit</button></div>
+    </div>
+</div>
+
+<!-- Grade Modal -->
+<div class="modal hidden" id="modal-grade">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-grade')"></div>
+    <div class="modal-content glass-card small">
+        <div class="modal-header"><h2><i data-lucide="award"></i> Grade Submission</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-grade')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div id="grade-submission-info"></div>
+            <div class="form-group"><label>Grade</label><input type="number" id="grade-value" min="0" placeholder="Score"></div>
+            <div class="form-group"><label>Feedback</label><textarea id="grade-feedback" rows="3" placeholder="Optional feedback..."></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary btn-full" onclick="ClassroomView.gradeSubmission()"><i data-lucide="check"></i> Submit Grade</button></div>
+    </div>
+</div>
+
+<!-- Announcement Modal -->
+<div class="modal hidden" id="modal-announcement">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-announcement')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header"><h2><i data-lucide="megaphone"></i> Post Announcement</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-announcement')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Message</label><textarea id="announcement-content" rows="4" placeholder="Share with your class..."></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary" onclick="ClassroomView.postAnnouncement()"><i data-lucide="send"></i> Post</button></div>
+    </div>
+</div>
+
+<!-- Schedule Class Modal -->
+<div class="modal hidden" id="modal-schedule">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-schedule')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header"><h2><i data-lucide="calendar-plus"></i> Schedule Live Class</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-schedule')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Title *</label><input type="text" id="sched-title" placeholder="Class session title"></div>
+            <div class="form-group"><label>Description</label><textarea id="sched-desc" rows="2" placeholder="What will be covered..."></textarea></div>
+            <div class="form-row">
+                <div class="form-group"><label>Start Time *</label><input type="datetime-local" id="sched-start"></div>
+                <div class="form-group"><label>End Time *</label><input type="datetime-local" id="sched-end"></div>
+            </div>
+            <div class="form-group"><label>Recurring</label>
+                <select id="sched-recurring"><option value="none">One-time</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="App.closeModal('modal-schedule')">Cancel</button>
+            <button class="btn btn-primary" onclick="ClassroomView.createSchedule()"><i data-lucide="calendar-plus"></i> Schedule</button></div>
+    </div>
+</div>
+
+<!-- Create Quiz Modal -->
+<div class="modal hidden" id="modal-create-quiz">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-create-quiz')"></div>
+    <div class="modal-content glass-card large">
+        <div class="modal-header"><h2><i data-lucide="help-circle"></i> Create Live Quiz</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-create-quiz')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Quiz Title *</label><input type="text" id="quiz-title" placeholder="e.g. Chapter 5 Review"></div>
+            <div id="quiz-questions-builder">
+                <div class="quiz-q-item">
+                    <div class="form-group"><label>Question 1</label><input type="text" class="quiz-q-text" placeholder="Enter question"></div>
+                    <div class="form-row four-col">
+                        <input type="text" class="quiz-opt" placeholder="Option A">
+                        <input type="text" class="quiz-opt" placeholder="Option B">
+                        <input type="text" class="quiz-opt" placeholder="Option C">
+                        <input type="text" class="quiz-opt" placeholder="Option D">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Correct Answer (0-3)</label><input type="number" class="quiz-correct" value="0" min="0" max="3"></div>
+                        <div class="form-group"><label>Time Limit (sec)</label><input type="number" class="quiz-time" value="30" min="5"></div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="ClassroomView.addQuizQuestion()" style="margin-top:8px"><i data-lucide="plus"></i> Add Question</button>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="App.closeModal('modal-create-quiz')">Cancel</button>
+            <button class="btn btn-primary" onclick="ClassroomView.createQuiz()"><i data-lucide="zap"></i> Create Quiz</button></div>
+    </div>
+</div>
+
+<!-- Thread Modal -->
+<div class="modal hidden" id="modal-create-thread">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-create-thread')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header"><h2><i data-lucide="message-square"></i> New Discussion Thread</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-create-thread')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Title *</label><input type="text" id="thread-title" placeholder="Discussion topic"></div>
+            <div class="form-group"><label>Content *</label><textarea id="thread-content" rows="4" placeholder="Start the discussion..."></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary" onclick="ClassroomView.createThread()"><i data-lucide="send"></i> Post Discussion</button></div>
+    </div>
+</div>
+
+<!-- Todo Modal -->
+<div class="modal hidden" id="modal-add-todo">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-add-todo')"></div>
+    <div class="modal-content glass-card small">
+        <div class="modal-header"><h2><i data-lucide="check-square"></i> Add Task</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-add-todo')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Task *</label><input type="text" id="todo-text" placeholder="What needs to be done?"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Priority</label>
+                    <select id="todo-priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div>
+                <div class="form-group"><label>Due Date</label><input type="date" id="todo-due"></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary btn-full" onclick="ProductivityView.createTodo()"><i data-lucide="plus"></i> Add Task</button></div>
+    </div>
+</div>
+
+<!-- Bookmark Modal -->
+<div class="modal hidden" id="modal-add-bookmark">
+    <div class="modal-backdrop" onclick="App.closeModal('modal-add-bookmark')"></div>
+    <div class="modal-content glass-card small">
+        <div class="modal-header"><h2><i data-lucide="bookmark"></i> Add Bookmark</h2>
+            <button class="btn-icon" onclick="App.closeModal('modal-add-bookmark')"><i data-lucide="x"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>Title *</label><input type="text" id="bm-title" placeholder="Bookmark name"></div>
+            <div class="form-group"><label>Link</label><input type="text" id="bm-link" placeholder="URL or navigation hash"></div>
+            <div class="form-group"><label>Type</label>
+                <select id="bm-type"><option value="lecture">Lecture</option><option value="resource">Resource</option><option value="assignment">Assignment</option><option value="other">Other</option></select></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-primary btn-full" onclick="ProductivityView.createBookmark()"><i data-lucide="bookmark"></i> Save</button></div>
+    </div>
+</div>
+
+<!-- JavaScript Modules -->
+<script src="/static/js/app.js"></script>
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/classroom.js"></script>
+<script src="/static/js/chat.js"></script>
+<script src="/static/js/video.js"></script>
+<script src="/static/js/whiteboard.js"></script>
+<script src="/static/js/gamification.js"></script>
+<script src="/static/js/ai.js"></script>
+<script src="/static/js/productivity.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => App.init());</script>
+</body>
+</html>
